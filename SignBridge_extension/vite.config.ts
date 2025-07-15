@@ -1,22 +1,46 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
+import fsExtra from 'fs-extra';
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        content: path.resolve(__dirname, "src/content-script.ts"),
+        popup: path.resolve(__dirname, "src/popup.ts")
+      },
+      output: {
+        assetFileNames: 'assets/[name].[hash][extname]',
+        chunkFileNames: 'assets/[name].[hash].js',
+        entryFileNames: 'assets/[name].[hash].js'
+      }
+    },
+    outDir: "dist",
+    emptyOutDir: true
   },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+      "@": path.resolve(__dirname, "./src")
+    }
   },
-}));
+  plugins: [
+    {
+      name: 'copy-assets',
+      async buildStart() {
+        // Copy icons from public to dist
+        const icons = ['icon16.png', 'icon32.png', 'icon48.png', 'icon128.png'];
+        for (const icon of icons) {
+          const source = path.resolve(__dirname, 'public', icon);
+          const dest = path.resolve(__dirname, 'dist', icon);
+          await fsExtra.copy(source, dest);
+        }
+      }
+    },
+    {
+      name: 'copy-manifest',
+      closeBundle() {
+        fsExtra.copySync('manifest.json', 'dist/manifest.json');
+      }
+    }
+  ]
+});

@@ -17,16 +17,19 @@
     {
       "matches": [
         "*://meet.google.com/*",
-        "*://*.zoom.us/*", 
+        "*://*.zoom.us/*",
         "*://teams.microsoft.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "js": [
+        "assets/content.*.js"
+      ],
+      "css": [
+        "assets/index.*.css"
+      ]
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "SignBridge Controls",
     "default_icon": {
       "16": "icon16.png",
       "32": "icon32.png",
@@ -36,14 +39,21 @@
   },
   "icons": {
     "16": "icon16.png",
-    "32": "icon32.png", 
+    "32": "icon32.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
   "web_accessible_resources": [
     {
-      "resources": ["overlay.js", "tts.js", "model/gesture.js", "assets/*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "overlay.*.js",
+        "tts.*.js",
+        "model/gesture.*.js",
+        "assets/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
