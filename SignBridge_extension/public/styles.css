@@ -1,0 +1,235 @@
+/* SignBridge Extension Styles */
+
+/* Reset and base styles */
+.signbridge-overlay * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Overlay container */
+#signbridge-overlay {
+    /* Styles are defined in JavaScript for better control */
+}
+
+/* Animation keyframes */
+@keyframes signbridge-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes signbridge-fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes signbridge-slideIn {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes signbridge-bounce {
+    0%, 20%, 53%, 80%, 100% {
+        transform: translate3d(0, 0, 0);
+    }
+    40%, 43% {
+        transform: translate3d(0, -5px, 0);
+    }
+    70% {
+        transform: translate3d(0, -3px, 0);
+    }
+    90% {
+        transform: translate3d(0, -1px, 0);
+    }
+}
+
+/* Ensure overlay appears above video conference elements */
+#signbridge-overlay {
+    z-index: 999999 !important;
+}
+
+/* Prevent overlay from interfering with page interactions */
+.signbridge-no-interaction {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+/* Custom scrollbar for history in popup */
+.signbridge-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.signbridge-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+.signbridge-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.signbridge-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive design for mobile devices */
+@media (max-width: 768px) {
+    #signbridge-overlay {
+        font-size: 14px !important;
+        padding: 12px 16px !important;
+        max-width: calc(100vw - 20px) !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    #signbridge-overlay {
+        border: 2px solid white !important;
+        background: black !important;
+        color: white !important;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    #signbridge-overlay,
+    #signbridge-overlay * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Dark mode compatibility */
+@media (prefers-color-scheme: dark) {
+    #signbridge-overlay {
+        background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.98)) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+    }
+}
+
+/* Focus indicators for accessibility */
+.signbridge-focusable:focus {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+}
+
+/* Ensure text is readable */
+#signbridge-overlay {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    line-height: 1.4 !important;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Print styles */
+@media print {
+    #signbridge-overlay {
+        display: none !important;
+    }
+}
+
+/* Platform-specific adjustments */
+.signbridge-mac {
+    backdrop-filter: blur(20px) !important;
+}
+
+.signbridge-windows {
+    backdrop-filter: blur(10px) !important;
+}
+
+/* Error states */
+.signbridge-error {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.95)) !important;
+    color: white !important;
+    border-color: rgba(248, 113, 113, 0.3) !important;
+}
+
+/* Success states */
+.signbridge-success {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.9), rgba(22, 163, 74, 0.95)) !important;
+    color: white !important;
+    border-color: rgba(74, 222, 128, 0.3) !important;
+}
+
+/* Warning states */
+.signbridge-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(217, 119, 6, 0.95)) !important;
+    color: white !important;
+    border-color: rgba(251, 191, 36, 0.3) !important;
+}
+
+/* Loading states */
+.signbridge-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.signbridge-loading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: signbridge-shimmer 1.5s infinite;
+}
+
+@keyframes signbridge-shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Accessibility improvements */
+.signbridge-sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Ensure compatibility with common video conferencing platforms */
+
+/* Google Meet */
+[data-allocation-index] #signbridge-overlay,
+.KnUJPe #signbridge-overlay {
+    z-index: 10000 !important;
+}
+
+/* Zoom */
+.webclient #signbridge-overlay,
+.ReactModalPortal #signbridge-overlay {
+    z-index: 9999 !important;
+}
+
+/* Microsoft Teams */
+.ts-calling-screen #signbridge-overlay,
+.calling-screen #signbridge-overlay {
+    z-index: 10001 !important;
+}
