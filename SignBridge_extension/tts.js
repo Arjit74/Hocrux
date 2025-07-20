@@ -15,7 +15,26 @@ class TTSController {
         this.lastSpokenText = '';
         this.speakingTimeout = null;
         
-        this.initializeVoices();
+        this.initializeOnUserInteraction();
+    }
+
+    initializeOnUserInteraction() {
+        const userInteractionEvents = ['click', 'touchstart', 'keydown'];
+        const initializeAudio = () => {
+            // Initialize audio context here
+            this.synth = window.speechSynthesis;
+            this.initializeVoices();
+            
+            // Remove event listeners after initialization
+            userInteractionEvents.forEach(event => {
+                document.removeEventListener(event, initializeAudio);
+            });
+        };
+
+        // Add event listeners for user interaction
+        userInteractionEvents.forEach(event => {
+            document.addEventListener(event, initializeAudio, { once: true });
+        });
     }
 
     initializeVoices() {
@@ -118,6 +137,24 @@ class TTSController {
         
         // Set timeout to prevent stuck speech
         this.setSpeechTimeout(cleanText.length);
+        
+        // Listen for popup voice settings
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.action === 'speak') {
+                this.speak(message.text);
+                sendResponse({ success: true });
+            } else if (message.action === 'setVoiceSettings') {
+                this.updateSettings(message.settings);
+                sendResponse({ success: true });
+            }
+        });
+    }
+
+    updateSettings(settings) {
+        if (settings.voice) this.setVoice(settings.voice);
+        if (settings.rate) this.setRate(settings.rate);
+        if (settings.pitch) this.setPitch(settings.pitch);
+        if (settings.volume) this.setVolume(settings.volume);
     }
 
     cleanText(text) {

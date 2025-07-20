@@ -299,21 +299,43 @@
             </div>
         </div>
 
+        <!-- Voice Controls -->
+        <div class="voice-section">
+            <div class="voice-title">Voice Settings</div>
+            <div class="voice-controls">
+                <label for="voiceSelect">Voice:</label>
+                <select id="voiceSelect" class="voice-select">
+                    <option value="">Default Voice</option>
+                </select>
+                
+                <label for="rateSlider">Speed:</label>
+                <div class="rate-control">
+                    <input type="range" id="rateSlider" class="rate-slider" min="0.5" max="2" step="0.1" value="1">
+                    <span id="rateValue">1.0x</span>
+                </div>
+            </div>
+        </div>
+
         <div class="history">
             <div class="history-title">Translation History</div>
             <div id="historyList">
-                <div class="history-item">
-                    <div>Hello, how are you?</div>
-                    <div class="history-time">2 minutes ago</div>
-                </div>
-                <div class="history-item">
-                    <div>Thank you very much</div>
-                    <div class="history-time">5 minutes ago</div>
-                </div>
+                <div class="history-empty">No translations yet</div>
             </div>
         </div>
     </div>
 
-    <script src="popup.js"></script>
+    <!-- Add this near the top of your popup content -->
+    <button id="start-signbridge" class="btn btn-primary mb-2 w-full">
+        Activate SignBridge
+    </button>
+
+    <script>
+        document.getElementById('start-signbridge').addEventListener('click', () => {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                chrome.tabs.sendMessage(tabs[0].id, {action: 'initialize'});
+            });
+        });
+    </script>
+    <script src="popup-enhanced.js"></script>
 </body>
 </html>
