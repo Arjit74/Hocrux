@@ -60,41 +60,55 @@ class GestureOverlayTester:
         self.min_speak_interval = 2.0  # Minimum seconds between speaking the same text
         
     def _init_camera(self):
-        """Initialize the camera with optimized settings for performance."""
-        max_attempts = 3
+        """Initialize the camera, trying both physical camera and OBS Virtual Camera."""
+        max_attempts = 4  # Increased to try more camera sources
         for attempt in range(max_attempts):
             try:
                 # Release any existing camera instance
                 if hasattr(self, 'cap') and self.cap is not None:
                     self.cap.release()
                 
-                # Try different camera backends with optimized settings
+                # Try different camera sources
                 if attempt == 0:
-                    # First try with DirectShow (works well on Windows) with MJPG codec
-                    self.cap = cv2.VideoCapture(self.config['camera']['device_id'], cv2.CAP_DSHOW)
-                    # Set buffer size to 1 to reduce latency
-                    self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                    # Set MJPG codec which is typically faster than default
-                    self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
+                    # Try OBS Virtual Camera first (Windows)
+                    self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)  # OBS Virtual Camera is often index 1
+                    print("Trying OBS Virtual Camera...")
+                elif attempt == 1:
+                    # Try OBS Virtual Camera with different index
+                    self.cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+                    print("Trying OBS Virtual Camera (index 2)...")
+                elif attempt == 2:
+                    # Try physical camera with DirectShow
+                    self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                    print("Trying physical camera with DirectShow...")
                 else:
-                    # Fall back to default backend with reduced resolution for better performance
-                    self.cap = cv2.VideoCapture(self.config['camera']['device_id'])
+                    # Last attempt with default backend
+                    self.cap = cv2.VideoCapture(0)
+                    print("Trying default camera...")
                 
                 if not self.cap.isOpened():
                     raise RuntimeError(f"Could not open camera (attempt {attempt + 1}/{max_attempts})")
                 
                 # Set camera properties with priority on speed
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Lower resolution for better performance
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # Higher resolution for better recognition
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                 self.cap.set(cv2.CAP_PROP_FPS, 30)  # 30 FPS is sufficient for ASL
                 
-                # Disable auto-focus and auto-exposure for more consistent performance
-                try:
-                    self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-                    self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)  # 1 = manual mode
-                    self.cap.set(cv2.CAP_PROP_EXPOSURE, 0.25)     # Adjust exposure if needed
-                except:
-                    pass  # Ignore if camera doesn't support these settings
+                # For OBS Virtual Camera, we might not be able to set these properties
+                if attempt < 2:  # Skip for OBS Virtual Camera attempts
+                    try:
+                        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))
+                        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimal buffer size
+                    except:
+                        pass
+                else:
+                    # For physical camera, try to optimize settings
+                    try:
+                        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+                        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)  # 1 = manual mode
+                        self.cap.set(cv2.CAP_PROP_EXPOSURE, 0.25)     # Adjust exposure if needed
+                    except:
+                        pass  # Ignore if camera doesn't support these settings
                 
                 # Test frame capture with timeout
                 start_time = time.time()
