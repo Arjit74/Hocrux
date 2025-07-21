@@ -9,14 +9,17 @@ class ASLOverlay {
         this.confidenceMeter = document.getElementById('confidence-meter');
         this.overlayContainer = document.getElementById('overlay-container');
         this.lastUpdateTime = 0;
-        this.updateInterval = 100; // ms between updates
+        this.updateInterval = 100; // ms between UI updates
         this.autoHideTimer = null;
         this.autoHideTimeout = 5000; // 5 seconds
         this.isVisible = true;
         this.currentText = '';
         this.currentConfidence = 0;
         this.lastApiCheck = 0;
-        this.apiCheckInterval = 100; // ms between API checks
+        this.apiCheckInterval = 300; // ms between API checks (reduced from 100ms)
+        this.lastGestureTime = 0;
+        this.gestureCooldown = 500; // ms to wait before accepting new gesture
+        this.serverUrl = window.location.origin; // Get the current server URL
         
         this.initialize();
     }
@@ -92,10 +95,53 @@ class ASLOverlay {
         }
     }
 
-    updateOverlay(text, confidence = 1.0) {
-        if (text !== this.currentText) {
+    updateOverlay(text, confidence = 0.0) {
+        // Always update if we're changing to/from 'No gesture detected'
+        const wasNoGesture = this.currentText === 'No gesture detected' || !this.currentText;
+        const isNoGesture = text === 'No gesture detected' || !text || confidence < 0.5;
+        
+        // Check if we have a significant change
+        const confidenceChanged = Math.abs(confidence - this.currentConfidence) > 0.1;
+        const textChanged = text !== this.currentText;
+        
+        if (textChanged || confidenceChanged || wasNoGesture !== isNoGesture) {
             this.currentText = text;
-            this.translationElement.textContent = text;
+            this.currentConfidence = confidence;
+            this.lastGestureTime = performance.now();
+            
+            // Determine what to display
+            const displayText = isNoGesture ? 'No gesture detected' : text;
+            const shouldShowConfidence = !isNoGesture && confidence > 0;
+            
+            // Only update the DOM if the display text actually changed
+            if (displayText !== this.translationElement.textContent) {
+                this.translationElement.textContent = displayText;
+                
+                // Update confidence meter
+                if (shouldShowConfidence) {
+                    const confidencePercent = Math.round(confidence * 100);
+                    this.confidenceMeter.textContent = `${confidencePercent}%`;
+                    this.confidenceMeter.style.display = 'block';
+                    
+                    // Color code confidence level
+                    if (confidence > 0.8) {
+                        this.confidenceMeter.style.color = '#4CAF50'; // Green
+                    } else if (confidence > 0.5) {
+                        this.confidenceMeter.style.color = '#FFC107'; // Yellow
+                    } else {
+                        this.confidenceMeter.style.color = '#F44336'; // Red
+                    }
+                } else {
+                    this.confidenceMeter.style.display = 'none';
+                }
+                
+                // Trigger animation only for new gestures, not when clearing
+                if (!isNoGesture) {
+                    this.translationElement.classList.remove('new-text');
+                    void this.translationElement.offsetWidth; // Force reflow
+                    this.translationElement.classList.add('new-text');
+                }
+            }
             this.translationElement.classList.remove('new-text');
             // Force reflow to restart animation
             void this.translationElement.offsetWidth;
@@ -185,20 +231,51 @@ class ASLOverlay {
     }
 
     async checkForUpdates() {
-        // This can be used for polling if needed
-        // For now, we're using the message-based approach
+        try {
+            const response = await fetch(`${this.serverUrl}/api/current?t=${Date.now()}`, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data) {
+                    // Get gesture and confidence from response
+                    const gesture = data.gesture || data.detection?.gesture || '';
+                    const confidence = parseFloat(data.confidence || data.detection?.confidence || 0);
+                    const status = data.status || 'waiting';
+                    
+                    // Always update if we have a status change or new gesture
+                    if (status === 'active' && confidence > 0.5) {
+                        this.updateOverlay(gesture, confidence);
+                    } else {
+                        // No valid gesture detected
+                        this.updateOverlay('', 0);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error checking for updates:', error);
+            // Don't update the display on error to avoid flickering
+        }
     }
-
-    updateLoop(timestamp) {
-        const deltaTime = timestamp - this.lastUpdateTime;
+    
+    updateLoop() {
+        const now = performance.now();
         
-        // Check for updates at regular intervals
-        if (timestamp - this.lastApiCheck >= this.apiCheckInterval) {
+        // Check for updates from the server at regular intervals
+        // Only check if we're not in a cooldown period
+        if (now - this.lastApiCheck >= this.apiCheckInterval && 
+            now - this.lastGestureTime >= this.gestureCooldown) {
             this.checkForUpdates();
-            this.lastApiCheck = timestamp;
+            this.lastApiCheck = now;
         }
         
-        this.lastUpdateTime = timestamp;
+        // Continue the animation loop
         requestAnimationFrame((ts) => this.updateLoop(ts));
     }
 }
@@ -211,14 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         console.log('Running in development mode');
         
-        // Example of how to test the overlay directly
-        const testPhrases = [
-            { text: 'Hello!', confidence: 0.95 },
-            { text: 'How are you?', confidence: 0.85 },
-            { text: 'This is a test', confidence: 0.75 },
-            { text: 'ASL Translator', confidence: 0.9 },
-            { text: 'Try it with OBS!', confidence: 0.8 }
-        ];
+        // // Example of how to test the overlay directly
+        // const testPhrases = [
+        //     { text: 'Hello!', confidence: 0.95 },
+        //     { text: 'How are you?', confidence: 0.85 },
+        //     { text: 'This is a test', confidence: 0.75 },
+        //     { text: 'ASL Translator', confidence: 0.9 },
+        //     { text: 'Try it with OBS!', confidence: 0.8 }
+        // ];
         
         let index = 0;
         setInterval(() => {

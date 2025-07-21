@@ -38,64 +38,18 @@ class GestureRecognizer:
             min_tracking_confidence=min_tracking_confidence
         )
         
-        # ASL Fingerspelling Alphabet with common variations
+        # ASL Fingerspelling Alphabet (only single letters and numbers)
         self.gesture_map = {
-            # Letters
+            # Letters A-Z (0-25)
             0: "A", 1: "B", 2: "C", 3: "D", 4: "E", 5: "F", 6: "G", 7: "H", 8: "I", 9: "J",
             10: "K", 11: "L", 12: "M", 13: "N", 14: "O", 15: "P", 16: "Q", 17: "R", 18: "S", 19: "T",
             20: "U", 21: "V", 22: "W", 23: "X", 24: "Y", 25: "Z",
-            # Numbers
-            26: "1", 27: "2", 28: "3", 29: "4", 30: "5", 31: "6", 32: "7", 33: "8", 34: "9", 35: "0",
-            # Common words/phrases (as single gestures)
-            36: "HELLO", 37: "THANK YOU", 38: "YES", 39: "NO", 40: "PLEASE",
-            41: "SORRY", 42: "HELP", 43: "I LOVE YOU", 44: "WHAT", 45: "WHEN",
-            46: "WHERE", 47: "WHY", 48: "HOW", 49: "NAME", 50: "MEET",
-            51: "NICE", 52: "AGAIN", 53: "SIGN", 54: "LANGUAGE", 55: "LEARN"
+            # Numbers 1-0 (26-35)
+            26: "1", 27: "2", 28: "3", 29: "4", 30: "5", 31: "6", 32: "7", 33: "8", 34: "9", 35: "0"
         }
         
-        # Common phrases and their component signs
-        self.word_map = {
-            # Greetings
-            "HELLO": ["HELLO"],
-            "HI": ["H", "I"],
-            "GOOD MORNING": ["G", "O", "O", "D", " ", "M", "O", "R", "N", "I", "N", "G"],
-            "GOOD NIGHT": ["G", "O", "O", "D", " ", "N", "I", "G", "H", "T"],
-            
-            # Common phrases
-            "THANK YOU": ["THANK YOU"],
-            "YOU'RE WELCOME": ["Y", "O", "U", "'", "R", "E", " ", "W", "E", "L", "C", "O", "M", "E"],
-            "I'M SORRY": ["I", "'", "M", " ", "SORRY"],
-            "EXCUSE ME": ["E", "X", "C", "U", "S", "E", " ", "M", "E"],
-            "PLEASE": ["PLEASE"],
-            
-            # Questions
-            "WHAT IS YOUR NAME": ["WHAT", " ", "I", "S", " ", "Y", "O", "U", "R", " ", "NAME"],
-            "MY NAME IS": ["M", "Y", " ", "NAME", " ", "I", "S"],
-            "HOW ARE YOU": ["HOW", " ", "A", "R", "E", " ", "Y", "O", "U"],
-            "I'M FINE": ["I", "'", "M", " ", "F", "I", "N", "E"],
-            "NICE TO MEET YOU": ["NICE", " ", "T", "O", " ", "MEET", " ", "Y", "O", "U"],
-            
-            # Common verbs
-            "I NEED HELP": ["I", " ", "N", "E", "E", "D", " ", "HELP"],
-            "I LOVE YOU": ["I LOVE YOU"],
-            "I UNDERSTAND": ["I", " ", "U", "N", "D", "E", "R", "S", "T", "A", "N", "D"],
-            "I DON'T UNDERSTAND": ["I", " ", "D", "O", "N", "'", "T", " ", "U", "N", "D", "E", "R", "S", "T", "A", "N", "D"],
-            "PLEASE REPEAT": ["PLEASE", " ", "R", "E", "P", "E", "A", "T"],
-            
-            # Basic signs
-            "YES": ["YES"],
-            "NO": ["NO"],
-            "MAYBE": ["M", "A", "Y", "B", "E"],
-            "LATER": ["L", "A", "T", "E", "R"],
-            "NOW": ["N", "O", "W"],
-            
-            # Emergency
-            "HELP": ["HELP"],
-            "CALL 911": ["C", "A", "L", "L", " ", "9", "1", "1"],
-            "I NEED WATER": ["I", " ", "N", "E", "E", "D", " ", "W", "A", "T", "E", "R"],
-            "I NEED FOOD": ["I", " ", "N", "E", "E", "D", " ", "F", "O", "O", "D"],
-            "WHERE IS THE BATHROOM": ["WHERE", " ", "I", "S", " ", "T", "H", "E", " ", "B", "A", "T", "H", "R", "O", "O", "M"]
-        }
+        # Remove word map to prevent static phrases from appearing
+        self.word_map = {}
         
         self.current_gesture = None
         self.gesture_history = []
