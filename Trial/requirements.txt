@@ -1,0 +1,29 @@
+# Core Dependencies
+numpy>=1.21.0
+opencv-python>=4.5.0
+mediapipe>=0.8.9.1
+pyyaml>=6.0
+loguru>=0.6.0
+
+# Text-to-Speech
+pyttsx3>=2.90  # Offline TTS
+gTTS>=2.3.1    # Online TTS (Google)
+pygame>=2.1.2  # For audio playback with gTTS
+
+# Web Interface (for future use)
+flask>=2.0.0
+flask-socketio>=5.0.0
+
+# Development Tools
+pytest>=7.0.0
+black>=22.0.0
+flake8>=4.0.0
+mypy>=0.910
+
+# Optional: For model training/inference
+tensorflow>=2.8.0  # If using TensorFlow models
+onnxruntime>=1.10.0  # If using ONNX models
+
+# For packaging
+setuptools>=58.0.0
+wheel>=0.37.0

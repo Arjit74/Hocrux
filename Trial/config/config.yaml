@@ -1,0 +1,77 @@
+# ASL Translation Pipeline Configuration
+
+# Camera settings
+camera:
+  device_id: 0               # Camera device ID (0 is usually the default webcam)
+  width: 1280                # Frame width
+  height: 720                # Frame height
+  fps: 30                    # Frames per second
+  flip_horizontal: true      # Flip the camera horizontally for mirror effect
+
+# Gesture recognition settings
+gesture_recognizer:
+  min_confidence: 0.7        # Minimum confidence threshold for gesture detection
+  smoothing_window: 5        # Number of frames to consider for smoothing
+  max_num_hands: 2           # Maximum number of hands to detect
+  min_detection_confidence: 0.7
+  min_tracking_confidence: 0.5
+
+# Text processing settings
+text_processor:
+  enable_grammar_correction: true
+  min_confidence: 0.5
+  # Custom gesture to text mappings (add your own here)
+  gesture_mappings:
+    thumbs_up: "Yes"
+    thumbs_down: "No"
+    open_hand: "Hello"
+    closed_fist: "Stop"
+    point: "You"
+    victory: "Peace"
+    rock: "Rock on!"
+    call_me: "Call me"
+    love_you: "I love you"
+    thank_you: "Thank you"
+
+# Text-to-speech settings
+tts:
+  enabled: true
+  engine: "pyttsx3"          # Options: "pyttsx3" (offline) or "gtts" (online)
+  rate: 150                  # Speech rate (words per minute)
+  volume: 1.0                # Volume (0.0 to 1.0)
+  voice: 0                   # Voice ID (for pyttsx3)
+
+# OBS integration settings
+obs:
+  enabled: true
+  output_dir: "output"
+  overlay_position: "bottom"  # Options: "top", "bottom", "left", "right"
+  auto_hide: true            # Auto-hide overlay after timeout
+  auto_hide_timeout: 5000    # Timeout in milliseconds
+  font_size: 24              # Font size in pixels
+  text_color: "#FFFFFF"      # Text color in hex
+  bg_color: "rgba(0, 0, 0, 0.7)"  # Background color with transparency
+
+# Debug settings
+debug:
+  show_fps: true
+  show_landmarks: true
+  show_bbox: true
+  log_level: "INFO"          # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  log_file: "logs/asl_translator.log"
+
+# Paths
+paths:
+  models: "models"
+  output: "output"
+  logs: "logs"
+  assets: "assets"
+  obs_overlay: "obs_overlay"
+
+# Application settings
+app:
+  auto_start: true
+  check_for_updates: true
+  save_output: true
+  save_video: false
+  video_output: "output/translation_output.avi"
