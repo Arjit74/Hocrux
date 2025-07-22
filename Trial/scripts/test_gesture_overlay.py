@@ -14,9 +14,39 @@ import json
 import requests
 import threading
 import argparse
+import logging
+import logging.handlers
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.handlers.RotatingFileHandler(
+            'asl_gesture_overlay.log',
+            maxBytes=5*1024*1024,  # 5MB
+            backupCount=3
+        )
+    ]
+)
+
+# Set log level for external libraries
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('PIL').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Add the project root to the Python path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -46,6 +76,65 @@ CONFIG = {
 }
 
 class GestureOverlayTester:
+    def _speak_gesture(self, text):
+        """Handle speaking the gesture with proper spacing and flow."""
+        try:
+            if not text or not text.strip():
+                logger.warning("Attempted to speak empty text")
+                return
+                
+            current_time = time.time()
+            
+            # Don't speak if we just spoke recently
+            time_since_last_speak = current_time - self.last_speak_time
+            if time_since_last_speak < self.min_speak_interval:
+                logger.debug(f"Skipping speech - too soon since last speak: {time_since_last_speak:.2f}s < {self.min_speak_interval}s")
+                return
+            
+            # Clean and prepare the text
+            text = text.strip()
+            
+            # Add space between words if needed
+            if (self.last_spoken_text and 
+                self.last_spoken_text[-1].isalnum() and 
+                text[0].isalnum()):
+                text = ' ' + text
+            
+            logger.info(f"Speaking gesture: '{text}'")
+            
+            # Update last spoken text and time
+            self.last_spoken_text = text
+            self.last_speak_time = current_time
+            
+            # Ensure TTS is available
+            if not hasattr(self, 'tts') or not self.tts:
+                logger.error("TTS not initialized!")
+                return
+                
+            # Log TTS engine info
+            logger.debug(f"Using TTS engine: {type(self.tts).__name__}")
+            
+            # Speak the text in a non-blocking way
+            speak_thread = threading.Thread(
+                target=self._safe_speak,
+                args=(text,),
+                name=f"TTS-{text[:20]}{'...' if len(text) > 20 else ''}",
+                daemon=True
+            )
+            speak_thread.start()
+            logger.debug(f"Started TTS thread for: '{text}'")
+            
+        except Exception as e:
+            logger.error(f"Error in _speak_gesture: {e}", exc_info=True)
+    
+    def _safe_speak(self, text):
+        """Safely call the TTS speak method with error handling."""
+        try:
+            self.tts.speak(text, block=False)
+            logger.debug(f"Successfully spoke: '{text}'")
+        except Exception as e:
+            logger.error(f"Error in TTS speak: {e}", exc_info=True)
+        
     def __init__(self, config):
         self.config = config
         self.overlay_url = f"http://{config['overlay']['host']}:{config['overlay']['port']}{config['overlay']['endpoint']}"
@@ -53,11 +142,15 @@ class GestureOverlayTester:
         self.running = False
         self.cap = None
         
-        # Initialize TTS
+        # Initialize TTS and conversation state
         self.tts = TTSManager(lang='en', slow=False)
         self.last_spoken_text = ""
         self.last_speak_time = 0
-        self.min_speak_interval = 2.0  # Minimum seconds between speaking the same text
+        self.min_speak_interval = 0.8  # Reduced minimum time between phrases
+        self.gesture_buffer = []
+        self.buffer_size = 3  # Number of consistent detections required
+        self.current_gesture = None
+        self.gesture_start_time = 0
         
     def _init_camera(self):
         """Initialize the camera, trying both physical camera and OBS Virtual Camera."""
@@ -132,103 +225,121 @@ class GestureOverlayTester:
                 if hasattr(self, 'cap') and self.cap is not None:
                     self.cap.release()
     
-    def update_overlay(self, text, confidence=0.0):
-        """Update the overlay with detected gesture information and speak the text."""
+    def update_overlay(self, text: str, confidence: float, speak: bool = True):
+        """
+        Update the OBS overlay with new text and confidence.
+        Only sends updates for valid gestures with sufficient confidence.
+        """
         try:
             current_time = time.time()
-            
-            # Only update if we have a valid gesture with sufficient confidence
-            display_text = text if confidence > 0.5 else 'No gesture detected'
-            
-            # Speak the detected text if it's new and has sufficient confidence
-            if (confidence > 0.5 and 
-                display_text != self.last_spoken_text and 
-                (current_time - self.last_speak_time) > self.min_speak_interval):
-                
-                # Update last spoken text and time
-                self.last_spoken_text = display_text
-                self.last_speak_time = current_time
-                
-                # Speak the text in a non-blocking way
-                threading.Thread(
-                    target=self.tts.speak,
-                    args=(display_text,),
-                    daemon=True
-                ).start()
-            
+            min_confidence = self.config.get('gesture', {}).get('min_confidence', 0.7)
+
+            if not text or confidence < min_confidence:
+                return  # Don't push weak/empty gestures
+
+            is_new = text != getattr(self, 'last_gesture', None)
+            time_held = current_time - getattr(self, 'last_gesture_time', 0)
+
             data = {
-                'text': display_text,
-                'confidence': confidence,
+                'text': text,
+                'confidence': float(confidence),
                 'timestamp': current_time,
-                'status': 'active' if confidence > 0.5 else 'waiting',
+                'status': 'active',
                 'detection': {
-                    'gesture': display_text,
-                    'confidence': confidence,
-                    'time_held': 0.0
+                    'gesture': text,
+                    'confidence': float(confidence),
+                    'time_held': time_held,
+                    'is_new': is_new
                 }
             }
-            
+
+            self.last_gesture = text
+            self.last_gesture_time = current_time
+
             response = requests.post(
                 self.overlay_url,
                 json=data,
                 headers={'Content-Type': 'application/json'},
                 timeout=1.0
             )
-            
+
             if response.status_code != 200:
-                print(f"Failed to update overlay: {response.status_code} - {response.text}")
-                
+                logger.warning(f"Overlay update failed with status {response.status_code}")
+            else:
+                logger.debug(f"Updated overlay: {text} (Confidence: {confidence:.1%})")
+
+            if speak and hasattr(self, 'tts') and self.tts:
+                self._speak_gesture(text)
+
+        except requests.RequestException as e:
+            logger.error(f"Failed to update overlay: {e}")
         except Exception as e:
-            print(f"Error updating overlay: {e}")
-    
+            logger.error(f"Unexpected error in update_overlay: {e}")
+        time.sleep(0.05)
+
     def run(self):
         """Run the gesture detection and overlay update loop."""
         if not self._init_camera():
             return
-        
+
         self.running = True
         last_gesture = None
         last_update = 0
-        
+        last_gesture_time = 0
+        last_spoken_time = 0
+        gesture_hold_time = 0
+        min_gesture_duration = 0.8
+        gesture_cooldown = 1.5
+
         print("Gesture detection started. Press 'q' to quit.")
-        
+
         try:
             while self.running:
+                current_time = time.time()
+
                 # Capture frame
                 ret, frame = self.cap.read()
                 if not ret:
                     print("Failed to capture frame")
                     break
-                
-                # Process frame at ~10 FPS to reduce CPU usage
-                current_time = time.time()
-                if current_time - last_update >= 0.1:  # 10 FPS
-                    # Process frame with gesture recognizer
+
+                # Run detection every ~0.1s
+                if current_time - last_update >= 0.1:
                     gesture, confidence = self.gesture_recognizer.process_frame(frame)
-                    
-                    # Only update if we have a new gesture with sufficient confidence
-                    if gesture and confidence > 0.7:  # Minimum confidence threshold
-                        if gesture != last_gesture:
-                            print(f"Detected gesture: {gesture} (Confidence: {confidence:.1%})")
-                            self.update_overlay(gesture, confidence)
+
+                    if gesture and confidence > 0.7:
+                        if gesture == last_gesture:
+                            gesture_hold_time = current_time - last_gesture_time
+                        else:
                             last_gesture = gesture
-                    
+                            last_gesture_time = current_time
+                            gesture_hold_time = 0
+
+                        # Always update the overlay visually
+                        self.update_overlay(gesture, confidence, speak=False)
+
+                        # Speak after hold & cooldown
+                        if gesture_hold_time >= min_gesture_duration and (current_time - last_spoken_time) >= gesture_cooldown:
+                            self.update_overlay(gesture, confidence, speak=True)
+                            last_spoken_time = current_time
+                    else:
+                        # Do not clear overlay on weak gestures
+                        pass
+
                     last_update = current_time
-                
-                # Display the frame (for debugging)
+
+                # Optional: show live frame
                 cv2.imshow('Gesture Detection', frame)
-                
-                # Check for quit key
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-                    
+
         except KeyboardInterrupt:
             print("\nStopping gesture detection...")
         except Exception as e:
             print(f"Error in gesture detection: {e}")
         finally:
             self.cleanup()
-    
+
     def cleanup(self):
         """Release resources."""
         self.running = False
@@ -239,40 +350,65 @@ class GestureOverlayTester:
 
 # Global variable to store the current detection state
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+from typing import Dict, Any
 
 @dataclass
-class DetectionState:
-    gesture: str = ''
+class Detection:
+    text: str = 'No gesture detected'
     confidence: float = 0.0
     timestamp: float = 0.0
     status: str = 'waiting'
-    last_updated: float = 0.0
+    detection: Dict[str, Any] = None
     
-    def to_dict(self):
-        return {
-            'gesture': self.gesture,
-            'confidence': self.confidence,
-            'timestamp': self.timestamp,
-            'status': self.status,
-            'detection': {
-                'gesture': self.gesture,
+    def __post_init__(self):
+        if self.detection is None:
+            self.detection = {
+                'gesture': self.text,
                 'confidence': self.confidence,
-                'time_held': time.time() - self.timestamp if self.timestamp > 0 else 0.0
+                'time_held': 0.0
             }
-        }
 
-# Initialize global state
-current_detection = DetectionState()
+# Global state for the current detection
+current_detection = Detection()
 
 def start_overlay_server(port=8000):
     """Start a Flask server for the overlay with API endpoints."""
-    from flask import Flask, request, jsonify, send_from_directory
+    from flask import Flask, jsonify, request, make_response, send_from_directory
     from flask_cors import CORS
     import json
     
     app = Flask(__name__, static_folder=os.path.join('..', 'obs_overlay'))
-    CORS(app)  # Enable CORS for all routes
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:8000", "http://127.0.0.1:8000"],
+            "methods": ["GET", "OPTIONS"],
+            "allow_headers": ["Content-Type"]
+        }
+    })
+    
+    # Rate limiting
+    from functools import wraps
+    from time import time
+    
+    RATE_LIMIT = 10  # Max requests per second
+    last_request_time = 0
+    
+    def rate_limited(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            nonlocal last_request_time
+            current_time = time()
+            time_since_last = current_time - last_request_time
+            
+            # Enforce minimum time between requests (100ms)
+            min_interval = 1.0 / RATE_LIMIT
+            if time_since_last < min_interval:
+                return make_response('Too many requests', 429)
+            
+            last_request_time = current_time
+            return f(*args, **kwargs)
+        return decorated_function
     
     @app.route('/')
     def index():
@@ -283,41 +419,40 @@ def start_overlay_server(port=8000):
         return send_from_directory(app.static_folder, path)
     
     @app.route('/api/update', methods=['POST', 'OPTIONS'])
+    @rate_limited
     def update_detection():
         global current_detection
         if request.method == 'OPTIONS':
-            # Handle preflight request
-            response = jsonify({'status': 'success'})
+            response = make_response()
             response.headers.add('Access-Control-Allow-Origin', '*')
             response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-            response.headers.add('Access-Control-Allow-Methods', 'POST')
+            response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
             return response
             
         try:
-            data = request.get_json()
+            data = request.get_json(force=True)
             if not data:
                 return jsonify({'status': 'error', 'message': 'No data provided'}), 400
                 
-            new_text = data.get('text', '')
-            new_confidence = float(data.get('confidence', 0))
-            now = time.time()
+            # Get current timestamp
+            import time as time_module
+            current_time = time_module.time()
             
-            # Only update if there's a significant change or after a cooldown
-            min_confidence_change = 0.1  # 10% confidence change threshold
-            cooldown_period = 0.5  # 500ms cooldown between updates
-            
-            should_update = (
-                (new_text != current_detection.gesture) or  # Text changed
-                (abs(new_confidence - current_detection.confidence) > min_confidence_change) or  # Significant confidence change
-                (now - current_detection.last_updated > cooldown_period)  # Cooldown period passed
+            current_detection = Detection(
+                text=data.get('text', 'No gesture detected'),
+                confidence=float(data.get('confidence', 0.0)),
+                timestamp=current_time,
+                status='active' if float(data.get('confidence', 0.0)) > 0.5 else 'waiting',
+                detection={
+                    'gesture': data.get('text'),
+                    'confidence': float(data.get('confidence', 0.0)),
+                    'time_held': 0.0
+                }
             )
             
-            if should_update and new_confidence > 0.1:  # Minimum confidence threshold
-                current_detection.gesture = new_text
-                current_detection.confidence = new_confidence
-                current_detection.timestamp = now
-                current_detection.status = 'active' if new_text else 'waiting'
-                current_detection.last_updated = now
+            # Only log successful updates
+            if float(data.get('confidence', 0)) > 0.7:
+                print(f"Updated detection: {current_detection.text} (Confidence: {current_detection.confidence:.2f})")
                 
             response = jsonify({'status': 'success'})
             response.headers.add('Access-Control-Allow-Origin', '*')
@@ -327,15 +462,34 @@ def start_overlay_server(port=8000):
             print(f"Error in update_detection: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
     
-    @app.route('/api/current')
-    def get_current_detection():
-        response = jsonify(current_detection.to_dict())
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        # Add cache control headers to prevent unnecessary requests
-        response.headers.add('Cache-Control', 'no-cache, no-store, must-revalidate')
-        response.headers.add('Pragma', 'no-cache')
-        response.headers.add('Expires', '0')
-        return response
+    @app.route('/api/current', methods=['GET', 'OPTIONS'])
+    @rate_limited
+    def get_current():
+        try:
+            # Convert Detection object to dict
+            detection_dict = {
+                'text': current_detection.text,
+                'confidence': current_detection.confidence,
+                'timestamp': current_detection.timestamp,
+                'status': current_detection.status,
+                'detection': current_detection.detection
+            }
+            response = jsonify(detection_dict)
+            # Add cache control headers
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+        except Exception as e:
+            print(f"Error in get_current: {e}")
+            return jsonify({
+                'text': 'Error',
+                'confidence': 0.0,
+                'timestamp': time.time(),
+                'status': 'error',
+                'detection': {'gesture': 'Error', 'confidence': 0.0, 'time_held': 0.0}
+            })
     
     print(f"Overlay server running at http://localhost:{port}")
     print("Open this URL in OBS browser source:")

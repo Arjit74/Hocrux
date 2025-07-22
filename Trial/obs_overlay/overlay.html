@@ -2,15 +2,108 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>ASL Translator Overlay</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Critical styles inlined for immediate rendering */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent !important;
+        }
+        
+        #overlay-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 20px;
+            pointer-events: none;
+            z-index: 999999;
+            background: transparent !important;
+        }
+        
+        #translation-text {
+            background-color: rgba(30, 30, 40, 0.9) !important;
+            color: white !important;
+            padding: 12px 24px !important;
+            border-radius: 8px !important;
+            font-size: 28px !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+            max-width: 90% !important;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.3s ease !important;
+            margin-bottom: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            line-height: 1.4 !important;
+            letter-spacing: 0.2px !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5) !important;
+            -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.3) !important;
+            position: relative;
+            z-index: 1000000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        #translation-text.visible {
+            opacity: 1 !important;
+            transform: translateY(0) scale(1.02) !important;
+        }
+        
+        #confidence-meter {
+            width: 0%;
+            height: 4px;
+            background: linear-gradient(90deg, #5a9df6, #7ab0ff);
+            margin-top: 5px;
+            border-radius: 2px;
+            transition: width 0.3s ease, background-color 0.3s ease;
+            opacity: 0.9;
+            max-width: 90%;
+        }
+    </style>
+    <link rel="stylesheet" href="style.css" media="all">
 </head>
 <body>
     <div id="overlay-container">
-        <div id="translation-text">Ready for ASL translation...</div>
+        <div id="translation-text">ASL Translator Ready</div>
         <div id="confidence-meter"></div>
     </div>
-    <script src="overlay.js"></script>
+    
+    <!-- Load scripts with defer to prevent render blocking -->
+    <script src="overlay.js" defer></script>
+    
+    <!-- Preload important resources -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Ensure the overlay is always visible in OBS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Force show the overlay container
+            const container = document.getElementById('overlay-container');
+            if (container) {
+                container.style.display = 'flex';
+            }
+            
+            // Initialize speech synthesis voices when they become available
+            if (window.speechSynthesis) {
+                window.speechSynthesis.onvoiceschanged = function() {
+                    console.log('Voices loaded');
+                };
+            }
+        });
+    </script>
 </body>
 </html>

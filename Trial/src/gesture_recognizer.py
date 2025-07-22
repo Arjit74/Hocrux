@@ -99,7 +99,7 @@ class GestureRecognizer:
             recognized_word = self._recognize_word()
             if recognized_word:
                 return recognized_word, confidence
-            
+            confidence = max(0.0, min(1.0, confidence))  # Clamp between 0 and 1
             return gesture, confidence
         
         return None, 0.0
